@@ -1,8 +1,10 @@
 import socket
 import threading
+from EventManager import EventManager
 
-class WModemHost:
+class WModem:
     def __init__(self, host, port):
+        self.events = EventManager()
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.packet_mods = {
             "Data": 0x80,
@@ -31,11 +33,19 @@ class WModemHost:
         self.receive_thread = threading.Thread(target=self.receive_loop, daemon=True)
         self.receive_thread.start()  # Start the background thread for receiving data
 
-    def packet_template(self,type,length,payload,checksum):
-        return bytes([self.packet_mods["HED"],self.packet_mods[type],length,self.packet_mods["SOP"],payload,checksum,self.packet_mods["EOP"]])
+    def packet_template(self,type,payload):
+        checksum = self.calculate_checksum(payload)
+        length = len(payload)
+        if type == "Data":
+            return bytes([self.packet_mods["HED"],self.packet_mods[type],length,self.packet_mods["SOP"],payload,checksum,self.packet_mods["EOP"]])
+        elif type == "DtD":
+            if payload in self.packet_mods:
+                return bytes([self.packet_mods["HED"],self.packet_mods[type],length,self.packet_mods["SOP"],self.packet_mods[payload],checksum,self.packet_mods["EOP"]])
+            else:
+                return bytes([self.packet_mods["HED"],self.packet_mods[type],length,self.packet_mods["SOP"],payload,checksum,self.packet_mods["EOP"]])
 
     def send_packet(self, data, packet_type="data"):
-        self.socket.send(self.packet_template(packet_type,len(data),data,self.calculate_checksum(data)))
+        self.socket.send(self.packet_template(packet_type,data))
 
     def calculate_checksum(self, data):
         checksum = 0
@@ -46,7 +56,7 @@ class WModemHost:
     def receive_loop(self):
         while True:
             try:
-                data = self.socket.recv(1024)  # Adjust the buffer size as needed
+                data = self.socket.recv(1024)
                 if not data:
                     break
                 self.handle_received_data(data)
@@ -58,15 +68,29 @@ class WModemHost:
         self.buffer.extend(data)  # Append received data to the buffer
 
     def process_buffer(self):
+        if self.state == "BUSY":
+            self.send_packet("OCK", packet_type="data")
+            return
         for i in range(len(self.buffer),0,-1):
             event = self.buffer[i-1]
             if event in self.commands.values():
                 if self.ign_count > 0:
                     self.ign_count -= 1
-                else:
-                    self.process_packet(self.buffer[:i])
-                    self.buffer = self.buffer[i:]
+                elif event == self.commands["ACK"]:
+                    self.packet_number_ack += 1
+                    self.events.trigger("ACK")
+                elif event == self.commands["NAK"]:
+                    self.packet_number_err += 1
+                    self.events.trigger("NAK")
+                elif event == self.commands["ABO"]:
+                    self.packet_number_err += 1
+                    self.events.trigger("ABO")
+                elif event == self.commands["OCK"]:
+                    self.events.trigger("OCK")
+                elif event == self.commands["ERR"]:
+                    self.packet_number_err += 1
+                    self.events.trigger("ERR")
+                elif event == self.commands["IGN"]:
+                    self.ign_count += 1
+                    self.events.trigger("IGN")
 
-    def receive_packet(self, data):
-        # Implement your packet processing logic here
-        print("Received packet:", data.hex())
