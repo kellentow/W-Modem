@@ -1,5 +1,6 @@
 import socket
 import threading
+import math
 from EventManager import EventManager
 
 class WModem():
@@ -51,7 +52,7 @@ class WModem():
         checksum = 0
         for i in range(len(data)):
             checksum += data[i]
-        return checksum % 256
+        return math.mod(checksum, 256)
 
     def receive_loop(self):
         while True:
