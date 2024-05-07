@@ -1,8 +1,9 @@
-# WModem USB Data Transfer Protocol Documentation
+# WModem Data Transfer Protocol Documentation
 
 ## 1. Overview
 
-The WModem USB Data Transfer Protocol defines a basic method for emulating a modem-like data transfer interface over USB. This protocol enables simple and reliable data exchange between a USB device (emulating a modem) and a host computer.
+- The WModem Data Transfer Protocol defines a basic method for communication over the Internet. This protocol enables simple and reliable data exchange between 2 computers.
+- A Python Program has been included that impliments this as a class
 
 ## 2. Protocol Description
 
@@ -32,13 +33,13 @@ Each message follows this structure:
 | **Data Message** | Used for transmitting data (from device to host) resembling "received" data from the modem. | `0x80` |
 | **DtD Settings Agreement** | Agreeing on settings so that smooth data transfer can occur | `0x81` |
 | **Saved for more data types**| Saved for future use | `0x82 - 0x85` |
-| **Acknowledgement** | Acknowledges receipt of a message. | `0x86` |
-| **NAK** | Not Acknowledged. Indicates that the message was not received. | `0x87` |
-| **Abort** | Aborts the current transmission. | `0x88` |
-| **Busy** | Busy. Indicates that the modem is busy. | `0x89` |
-| **Error** | Indicates that an error has occurred. | `0x8A` |
-| **Ignore** | Ignores the next Command code (Allows for extended alphabets to not interfere with the transfer protocol) | `0x8B` |
-| **Search Ping** | Used to search for a device. | `0x8C` |
+| **Acknowledgement** | Acknowledges receipt of a message. (sent in DtD message) | `0x86` |
+| **NAK** | Not Acknowledged. Indicates that the message was not received. (sent in DtD message) | `0x87` |
+| **Abort** | Aborts the current transmission. (sent in DtD message) | `0x88` |
+| **Busy** | Busy. Indicates that the modem is busy. (sent in DtD message) | `0x89` |
+| **Error** | Indicates that an error has occurred. (sent in DtD message) | `0x8A` |
+| **Ignore** | Ignores the next Command code (Allows for extended alphabets to not interfere with the transfer protocol) (sent in DtD message) | `0x8B` |
+| **Search Ping** | Used to search for a device. (Only exception for sending messages, sent alone without the default structure) | `0x8C` |
 | **Start Of Payload** | Indicates the start of the payload. | `0x8D` |
 | **Header**| Indicates the start of the header. | `0x8E` |
 | **End Of Payload** | Indicates the end of the payload. | `0x8F` |
@@ -48,29 +49,13 @@ Each message follows this structure:
 
 ### 3.1 Sending search ping
 
-The host sends a search command to all curently connected devices and the client should send a ACK message.
-
-## 4. USB Configuration
-
-### 4.1 USB Device Class
-
-The USB device class used is Vendor-Specific (0xFF), emulating a modem-like interface.
-
-### 4.2 Endpoints
-
-- **Endpoint 1 (IN)**: Used for sending data (from device to host) resembling "received" data from the modem.
-  - **Type**: Bulk endpoint.
-  - **Max Packet Size**: 64 bytes.
-
-- **Endpoint 2 (OUT)**: Used for receiving data (from host to device) resembling "transmitted" data to the modem.
-  - **Type**: Bulk endpoint.
-  - **Max Packet Size**: 64 bytes.
+The host sends a search command to all currently connected devices and the client should send an ACK message.
 
 ## 5. Protocol Implementation
 
 ### 5.1 Device Initialization
 
-1. Configure USB peripheral.
+1. Configure Internet connectivity.
 2. Implement endpoint handlers for data transmission/reception.
 
 ### 5.2 Message Handling
@@ -101,8 +86,9 @@ A timeout mechanism is implemented to handle situations where expected data is n
 To ensure data integrity, a checksum can be calculated and transmitted alongside each message. The receiver verifies the checksum to detect transmission errors.
 
 **Implementation**:
-- Include a checksum (e.g., CRC-16) in the message header or footer.
+- Include a the checksum in the message footer.
 - Calculate the checksum over the message payload and compare it with the received checksum.
+- The calculation is: `length(payload)%256`
 - If the checksums do not match, consider the message corrupted and request retransmission.
 
 #### 5.4.3 NAK (Negative Acknowledgment) and Retransmission
@@ -139,7 +125,10 @@ Maintain clear state management to handle transitions between communication stat
 
 ### 5.5 Example Error Scenarios
 
-Provide examples of common error scenarios encountered during data transmission and demonstrate how error handling mechanisms are utilized to recover from these situations.
+#### The payload is the wrong size
+* The payload is the wrong size, and the receiver does not receive the expected number of bytes.
+* The client or server sends an Error (`0x8A`)
+* The sender re-sends the message.
 
 **Examples**:
 1. Timeout error due to data not being received within a specified duration.
@@ -151,19 +140,19 @@ Provide examples of common error scenarios encountered during data transmission 
 ### 6.1 Sending Data (Device to Host)
 
 1. Construct a data message resembling "received" data from the modem.
-2. Send the message via Endpoint 1.
+2. Send the message via Internet connectivity.
 
 ### 6.2 Receiving Data (Host to Device)
 
-1. Poll Endpoint 2 for incoming data resembling "transmitted" data to the modem.
+1. Poll for incoming data resembling "transmitted" data to the modem.
 2. Parse and process received messages.
 
 ## 7. Dependencies
 
-- **Hardware**: USB-capable microcontroller or USB device.
-- **Firmware**: USB stack/library supporting bulk data transfer.
+- **Hardware**: Internet-capable microcontroller or Internet-connected device.
+- **Firmware**: Network stack/library supporting data transfer over the Internet.
 - **Host Application**: Software on the host for sending/receiving data.
 
 ## 8. Conclusion
 
-This documentation provides a guideline for implementing and using the WModem USB Data Transfer Protocol for emulating a modem-like data transfer interface over USB. Refer to this documentation for protocol details and integration instructions.
+This documentation provides a guideline for implementing and using the WModem Data Transfer Protocol for emulating a modem-like data transfer interface over the Internet. Refer to this documentation for protocol details and integration instructions.
