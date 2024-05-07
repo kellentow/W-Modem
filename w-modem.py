@@ -2,7 +2,7 @@ import socket
 import threading
 from EventManager import EventManager
 
-class WModem:
+class WModem():
     def __init__(self, host, port):
         self.events = EventManager()
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
