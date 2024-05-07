@@ -88,7 +88,11 @@ class WModem():
         if self.state == "BUSY":
             self.send_packet("OCK", packet_type="data")
             return
+        decoded = []
         for i in range(len(self.buffer),0,-1):
+            payload = i[i.index(self.packet_mods["SOP"])+1:i.index(self.packet_mods["EOP"])-2]
+            rec_check = i[i.index(self.packet_mods["EOP"])-1].decode()
+            type = i[i.index(self.packet_mods["HED"])+1]
             event = self.buffer[i-1]
             if event in self.commands.values():
                 if self.ign_count > 0:
@@ -110,5 +114,8 @@ class WModem():
                 elif event == self.commands["IGN"]:
                     self.ign_count += 1
                     self.events.trigger("IGN")
+            decoded.append({"type":type,"payload":payload,"checksum":rec_check})
+        return decoded
+            
 
 m = WModem("127.0.0.1","1701")
