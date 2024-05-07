@@ -5,6 +5,17 @@ from EventManager import EventManager
 
 class WModem():
     def __init__(self, host, port):
+        self.version = [0x0,0x01,0x01]
+        self.version_txt = ""
+        if self.version[0] == 0x0:
+            self.version_txt += "dev"
+        elif self.version[0] == 0x1:
+            self.version_txt += "alpha"
+        elif self.version[0] == 0x2:
+            self.version_txt += "beta"
+        self.version_txt += " "+str(int(self.version[1]))
+        self.version_txt += "."+str(int(self.version[2]))
+        print(self.version_txt)
         self.events = EventManager()
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.packet_mods = {
@@ -21,11 +32,10 @@ class WModem():
             "OCK": 0x89,
             "ERR": 0x8A,
             "IGN": 0x8B,
-            "SEA": 0x8C,
         }
         self.state = "IDLE"
         self.buffer = bytearray()  # Use bytearray to accumulate incoming data
-        self.packet_size = 128
+        self.packet_size = 1024
         self.packet_number = 0
         self.packet_number_ack = 0
         self.packet_number_err = 0
@@ -57,7 +67,7 @@ class WModem():
     def receive_loop(self):
         while True:
             try:
-                data = self.socket.recv(1024)
+                data = self.socket.recv(self.packet_size)
                 if not data:
                     break
                 self.handle_received_data(data)
@@ -66,7 +76,13 @@ class WModem():
                 break
 
     def handle_received_data(self, data):
-        self.buffer.extend(data)  # Append received data to the buffer
+        payload = data[data.index(self.packet_mods["SOP"])+1:data.index(self.packet_mods["EOP"])-2]
+        rec_check = data[data.index(self.packet_mods["EOP"])-1].decode()
+        calc_check = self.calculate_checksum(payload)
+        if rec_check != calc_check:
+            self.send_packet("ERR","DtD")
+        elif rec_check == calc_check:
+            self.buffer.extend(data)  # Append received data to the buffer
 
     def process_buffer(self):
         if self.state == "BUSY":
@@ -95,3 +111,4 @@ class WModem():
                     self.ign_count += 1
                     self.events.trigger("IGN")
 
+m = WModem("127.0.0.1","1701")
