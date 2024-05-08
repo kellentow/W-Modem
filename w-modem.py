@@ -2,28 +2,48 @@ import socket
 import threading
 import math
 from EventManager import EventManager
+import time
 
 class WModem():
-    def __init__(self, host, port):
+    """
+    A class to connect and interact with a server with the WModem protocall
+
+    Args:
+        host (str): IP to connect to
+        port (int): port to connect to
+        key = b''(int): The encryption key to use
+        startxt = True (bool): Whether to print the WModem version
+    """
+    def __init__(self, host, port, key = b'', startxt = True):
         self.version = [0x0,0x01,0x01]
-        self.version_txt = ""
+        if type(key) != int:
+            raise ValueError(f"Key must be an int and not a {type(key)}")
+        self.key = bytes(key)
+        self.version_txt = "WModem Version: "
         if self.version[0] == 0x0:
             self.version_txt += "dev"
         elif self.version[0] == 0x1:
             self.version_txt += "alpha"
         elif self.version[0] == 0x2:
             self.version_txt += "beta"
+        elif self.version[0] == 0x3:
+            self.version_txt += "pre-release"
+        elif self.version[0] == 0x4:
+            self.version_txt += "release"
         self.version_txt += " "+str(int(self.version[1]))
-        self.version_txt += "."+str(int(self.version[2]))
-        print(self.version_txt)
+        for num in self.version[2:]:
+            self.version_txt += "."+str(int(num))
+        if startxt:
+            print(self.version_txt)
         self.events = EventManager()
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.packet_mods = {
             "Data": 0x80,
             "DtD": 0x81,
+            "SEA": 0x8C,
             "SOP": 0x8D,
             "HED": 0x8E,
-            "EOP": 0xAF
+            "EOP": 0x8F
         }
         self.commands = {
             "ACK": 0x86,
@@ -32,17 +52,51 @@ class WModem():
             "OCK": 0x89,
             "ERR": 0x8A,
             "IGN": 0x8B,
+            "KAC": 0x90,
         }
-        self.state = "IDLE"
+        self.busy = False
         self.buffer = bytearray()  # Use bytearray to accumulate incoming data
         self.packet_size = 1024
         self.packet_number = 0
         self.packet_number_ack = 0
         self.packet_number_err = 0
         self.ign_count = 0
+        self.connected = False
 
         self.receive_thread = threading.Thread(target=self.receive_loop, daemon=True)
+        self.receive_thread = threading.Thread(target=self.keep_alive_loop, daemon=True)
         self.receive_thread.start()  # Start the background thread for receiving data
+
+    def keep_alive_loop(self):
+        while True:
+            try:
+                self.send_packet("KAC","DtD")
+                time.sleep(1)
+                for packet in self.buffer:
+                    payload = packet[packet.index(self.packet_mods["SOP"])+1:packet.index(self.packet_mods["EOP"])-2]
+                    t = packet[packet.index(self.packet_mods["HED"])+1]
+                    if t == self.packet_mods["DtD"] and payoad == self.commands["KAC"]:
+                        break
+                    else:
+                        raise ValueError("KAC not responded to")
+
+            except Exception as e:
+                print(f"KAC error: {e}")
+
+
+    def connect(self):
+        i = 0
+        self.busy = True
+        while not self.connected and i <=10:
+            self.socket.send(self.packet_mods["SEA"])
+            time.sleep(0.1)
+            if len(self.buffer) == 0:
+                i += 1
+            else:
+                self.connected = True
+        if not self.connected:
+            raise ValueError("Could not connect to other computer")
+        self.busy = False
 
     def packet_template(self,type,payload):
         checksum = self.calculate_checksum(payload)
@@ -85,7 +139,7 @@ class WModem():
             self.buffer.extend(data)  # Append received data to the buffer
 
     def process_buffer(self):
-        if self.state == "BUSY":
+        if self.busy:
             self.send_packet("OCK", packet_type="data")
             return
         decoded = []
@@ -119,3 +173,8 @@ class WModem():
             
 
 m = WModem("127.0.0.1","1701")
+m.events.listen("ACK",lambda: print("ACK"))
+m.connect()
+while True:
+    time.sleep(1)
+    print("waiting...")

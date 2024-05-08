@@ -21,7 +21,7 @@ Each message follows this structure:
 - **Payload**: Actual data to be transmitted.
     - **Payload Byte**: Indicates the start of the payload (`0x8D`)
     - **Payload Data**: Actual data to be transmitted.
-    - **Checksum Byte**: The checksum of the payload. (Note: this is calculating the sum of all bytes in the payload, including the checksum byte.)
+    - **Checksum Byte**: The checksum of the payload. (Note: this is not including the checksum byte.)
     - **End Byte**: Indicates the end of the payload (`0x8F`)
 
 ### 2.3 Supported Commands
@@ -41,7 +41,8 @@ Each message follows this structure:
 | **Start Of Payload** | Indicates the start of the payload. | `0x8D` |
 | **Header**| Indicates the start of the header. | `0x8E` |
 | **End Of Payload** | Indicates the end of the payload. | `0x8F` |
-| **Saved for more commands**| Saved for future use | `0x90 - 0xBF` |
+| **Keep Alive Call** | A message to make sure that the other device doesn't disconnect| `0x90` |
+| **Saved for more commands**| Saved for future use | `0x91 - 0xBF` |
 
 ## 3. Protocol Implementation
 
@@ -67,11 +68,7 @@ Error handling mechanisms are crucial for ensuring the reliability and robustnes
 
 #### 3.4.1 Timeout Mechanism
 
-A timeout mechanism is implemented to handle situations where expected data is not received within a specified timeframe.
-
-**Implementation**:
-- Maintain a timer to track elapsed time while waiting for data.
-- If the timeout period is exceeded before receiving expected data, trigger a timeout error.
+Every seccond a Keep Alive Call (KAC) is sent and if the other dvice doesn't send another KAC call within a seccond send an Abort Call and close the connection.
 
 #### 3.4.2 Checksum Verification
 
@@ -139,12 +136,19 @@ Maintain clear state management to handle transitions between communication stat
 1. Poll for incoming data resembling "transmitted" data to the modem.
 2. Parse and process received messages.
 
-## 5. Dependencies
+## 5. Security
+
+* Some encryption may be added but is not required by the protocall.
+
+## 6. Dependencies
 
 - **Hardware**: Internet-capable microcontroller or Internet-connected device.
 - **Firmware**: Network stack/library supporting data transfer over the Internet.
 - **Host Application**: Software on the host for sending/receiving data.
 
-## 6. Conclusion
+## 7. Conclusion
 
 This documentation provides a guideline for implementing and using the WModem Data Transfer Protocol for emulating a modem-like data transfer interface over the Internet. Refer to this documentation for protocol details and integration instructions.
+
+
+#### Note: this documentation is under the `MIT License`
